@@ -59,6 +59,8 @@ export class CustomProviderController {
       path_suffix: cp.path_suffix,
       has_api_key: !!up?.api_key_encrypted,
       models: cp.models,
+      enable_response_api: cp.enable_response_api,
+      response_api_config: cp.response_api_config,
       created_at: cp.created_at,
     };
   }
@@ -84,6 +86,8 @@ export class CustomProviderController {
       path_suffix: cp.path_suffix,
       has_api_key: !!up?.api_key_encrypted,
       models: cp.models,
+      enable_response_api: cp.enable_response_api,
+      response_api_config: cp.response_api_config,
       created_at: cp.created_at,
     };
   }

@@ -86,6 +86,7 @@ export class CustomProviderService {
       user_id: userId,
       name: dto.name,
       base_url: dto.base_url,
+      path_suffix: dto.path_suffix ?? null,
       models: dto.models.map((m) => ({
         model_name: m.model_name,
         input_price_per_million_tokens: m.input_price_per_million_tokens,
@@ -143,6 +144,10 @@ export class CustomProviderService {
         context_window: m.context_window ?? 128000,
         supports_response_api: m.supports_response_api ?? false,
       }));
+    }
+
+    if (dto.path_suffix !== undefined) {
+      cp.path_suffix = dto.path_suffix;
     }
 
     if (dto.enableResponseAPI !== undefined) {
