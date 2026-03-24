@@ -19,23 +19,33 @@ export async function bootstrap() {
   app.enableShutdownHooks();
   app.useGlobalFilters(new SpaFallbackFilter());
 
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:'],
-          connectSrc: ["'self'", 'https://eu.i.posthog.com'],
-          fontSrc: ["'self'"],
-          objectSrc: ["'none'"],
-          frameAncestors: ["'none'"],
+  // In local mode, use relaxed security settings to allow HTTP access
+  if (process.env['MANIFEST_MODE'] === 'local') {
+    app.use(
+      helmet({
+        contentSecurityPolicy: false, // Disable CSP entirely in local mode to allow HTTP access
+      }),
+    );
+  } else {
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:'],
+            connectSrc: ["'self'", 'https://eu.i.posthog.com'],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+            formAction: ["'self'"],
+          },
         },
-      },
-      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow loading from different IPs
-    }),
-  );
+        crossOriginResourcePolicy: { policy: 'same-origin' },
+      }),
+    );
+  }
 
   app.use(compression());
 
