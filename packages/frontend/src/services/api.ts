@@ -170,13 +170,18 @@ export function rotateAgentKey(agentName: string) {
   );
 }
 
-export function renameAgent(currentName: string, newName: string) {
+export function renameAgent(currentName: string, newName: string, timeoutMs?: number) {
+  const body: { name: string; request_timeout_ms?: number } = { name: newName };
+  if (timeoutMs !== undefined) {
+    body.request_timeout_ms = timeoutMs;
+  }
+
   return fetchMutate<{ renamed: boolean; name: string }>(
     `${BASE_URL}/agents/${encodeURIComponent(currentName)}`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName }),
+      body: JSON.stringify(body),
     },
   );
 }

@@ -1,4 +1,4 @@
-import { createSignal, createResource, Show, For, type Component } from 'solid-js';
+import { createSignal, createResource, Show, For, onMount, type Component } from 'solid-js';
 import { useParams, useNavigate, useLocation } from '@solidjs/router';
 import { Title, Meta } from '@solidjs/meta';
 import ErrorState from '../components/ErrorState.jsx';
@@ -6,7 +6,13 @@ import SetupStepInstall from '../components/SetupStepInstall.jsx';
 import SetupStepConfigure from '../components/SetupStepConfigure.jsx';
 import SetupStepVerify from '../components/SetupStepVerify.jsx';
 import { CopyButton } from '../components/SetupStepInstall.jsx';
-import { getAgentKey, deleteAgent, renameAgent, rotateAgentKey } from '../services/api.js';
+import {
+  getAgentKey,
+  getAgents,
+  deleteAgent,
+  renameAgent,
+  rotateAgentKey,
+} from '../services/api.js';
 import { toast } from '../services/toast-store.js';
 import { isLocalMode } from '../services/local-mode.js';
 import { agentDisplayName } from '../services/agent-display-name.js';
@@ -18,6 +24,7 @@ const Settings: Component = () => {
   const agentName = () => decodeURIComponent(params.agentName);
 
   const [name, setName] = createSignal(agentName());
+  const [timeoutMs, setTimeoutMs] = createSignal<number | undefined>(undefined);
   const [saving, setSaving] = createSignal(false);
   const [saved, setSaved] = createSignal(false);
   const [showDeleteModal, setShowDeleteModal] = createSignal(false);
@@ -33,6 +40,14 @@ const Settings: Component = () => {
     (n) => getAgentKey(n),
   );
 
+  const [agentsData] = createResource(
+    () => agentName(),
+    async () => {
+      const data = await getAgents();
+      return data.agents.find((a: { agent_name: string }) => a.agent_name === agentName());
+    },
+  );
+
   const endpoint = () => {
     const custom = apiKeyData()?.pluginEndpoint;
     if (custom) return custom;
@@ -41,13 +56,24 @@ const Settings: Component = () => {
     return `${window.location.origin}/otlp`;
   };
 
+  // Load current timeout value on mount
+  onMount(async () => {
+    const data = await getAgents();
+    const currentAgent = data.agents.find(
+      (a: { agent_name: string }) => a.agent_name === agentName(),
+    );
+    if (currentAgent?.request_timeout_ms) {
+      setTimeoutMs(currentAgent.request_timeout_ms);
+    }
+  });
+
   const handleSave = async () => {
     const newName = name().trim();
-    if (!newName || newName === agentName()) return;
+    if (!newName || (newName === agentName() && timeoutMs() === undefined)) return;
 
     setSaving(true);
     try {
-      const result = await renameAgent(agentName(), newName);
+      const result = await renameAgent(agentName(), newName, timeoutMs());
       const slug = result?.name ?? newName;
       navigate(`/agents/${encodeURIComponent(slug)}/settings`, {
         replace: true,
@@ -133,11 +159,42 @@ const Settings: Component = () => {
               />
             </div>
           </div>
+          <div class="settings-card__row">
+            <div class="settings-card__label">
+              <span class="settings-card__label-title">Request timeout (seconds)</span>
+              <span class="settings-card__label-desc">
+                Maximum time to wait for LLM responses. Leave empty for default (3 minutes).
+              </span>
+            </div>
+            <div class="settings-card__control">
+              <input
+                class="settings-card__input"
+                type="number"
+                min="10"
+                max="3600"
+                step="10"
+                aria-label="Request timeout in seconds"
+                value={timeoutMs() ? Math.round(timeoutMs()! / 1000) : ''}
+                placeholder="180 (default)"
+                onInput={(e) => {
+                  const val = e.currentTarget.value;
+                  if (val === '') {
+                    setTimeoutMs(undefined);
+                  } else {
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num) && num >= 10) {
+                      setTimeoutMs(num * 1000);
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
           <div class="settings-card__footer">
             <button
               class="btn btn--primary btn--sm"
               onClick={handleSave}
-              disabled={saving() || name().trim() === agentName()}
+              disabled={saving() || (name().trim() === agentName() && timeoutMs() === undefined)}
             >
               <span aria-live="polite">
                 {saved() ? (
