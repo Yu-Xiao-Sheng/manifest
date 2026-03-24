@@ -8,6 +8,7 @@ import { auth } from './auth/auth.instance';
 import { LOCAL_USER_ID, LOCAL_EMAIL } from './common/constants/local-mode.constants';
 import { SpaFallbackFilter } from './common/filters/spa-fallback.filter';
 import { isAllowedLocalIp } from './common/utils/local-ip';
+import { resolveFrontendDir } from './common/utils/frontend-path';
 
 export async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -59,6 +60,23 @@ export async function bootstrap() {
   // Disabled in local mode — loopback-only, no reverse proxy
   if (!isDev && process.env['MANIFEST_MODE'] !== 'local') {
     expressApp.set('trust proxy', 1);
+  }
+
+  // Serve static files from frontend directory (do this before other middleware)
+  const frontendDir = resolveFrontendDir();
+  if (frontendDir) {
+    expressApp.use(
+      express.static(frontendDir, {
+        maxAge: 31536000000, // 1 year
+        immutable: true,
+        setHeaders: (res, filepath) => {
+          // index.html must never be cached (SPA entry point)
+          if (filepath.endsWith('.html') || filepath.endsWith('/index.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+          }
+        },
+      }),
+    );
   }
 
   // Mount auth handlers

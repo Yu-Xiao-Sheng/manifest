@@ -27,7 +27,17 @@ export class SpaFallbackMiddleware implements NestMiddleware {
       return next();
     }
 
-    // Skip static assets (files with extensions)
+    const frontendDir = resolveFrontendDir();
+    if (frontendDir) {
+      // Check if the requested file exists in the frontend directory
+      const requestedFilePath = path.join(frontendDir, req.path);
+      if (fs.existsSync(requestedFilePath) && fs.statSync(requestedFilePath).isFile()) {
+        // File exists, let static middleware handle it
+        return next();
+      }
+    }
+
+    // Skip static assets (files with extensions) if they don't exist
     if (path.extname(req.path) !== '') {
       return next();
     }
