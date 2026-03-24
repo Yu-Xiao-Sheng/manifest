@@ -38,7 +38,7 @@ export class ProxyController {
     const body = req.body as Record<string, unknown>;
     const sessionKey = (req.headers['x-session-key'] as string) || 'default';
     const traceId = this.extractTraceId(req);
-    const isStream = body.stream === true;
+    let isStream = body.stream === true; // Changed to let for Responses API override
     let headersSent = false;
     let slotAcquired = false;
 
@@ -59,6 +59,11 @@ export class ProxyController {
         agentName,
         clientAbort.signal,
       );
+
+      // ChatGPT Responses API only supports streaming responses
+      if (forward.isChatGpt) {
+        isStream = true;
+      }
 
       this.trackFirstProxyRequest(userId, meta);
 

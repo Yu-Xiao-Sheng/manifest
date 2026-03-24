@@ -26,10 +26,11 @@ export function toResponsesRequest(
     .filter((m) => m.role !== 'system' && m.role !== 'developer')
     .map((m) => ({ role: m.role, content: convertContent(m.content, m.role) }));
 
+  // Responses API requires stream: true and store: false
   const request: Record<string, unknown> = {
     model,
     input,
-    stream: body.stream !== false,
+    stream: true, // Responses API only supports streaming
     store: false,
     instructions: extractInstructions(messages),
   };

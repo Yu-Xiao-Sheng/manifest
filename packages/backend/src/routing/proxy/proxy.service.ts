@@ -414,9 +414,33 @@ export class ProxyService {
     if (CustomProviderService.isCustom(provider)) {
       const cpId = CustomProviderService.extractId(provider);
       const cp = await this.customProviderService.getById(cpId);
+      this.logger.debug(
+        `Custom provider: ${cpId}, enable_response_api: ${cp?.enable_response_api}`,
+      );
       if (cp) {
-        customEndpoint = buildCustomEndpoint(cp.base_url, cp.path_suffix);
         forwardModel = CustomProviderService.rawModelName(model);
+
+        // Check if this custom provider uses Response API
+        if (cp.enable_response_api) {
+          // Use ChatGPT Responses API format
+          // For Response API, we use the base_url as-is and append /responses
+          const baseUrl = cp.base_url.replace(/\/$/, '');
+          const buildPath = () => '/responses';
+          const fullUrl = `${baseUrl}${buildPath()}`;
+          this.logger.debug(`Using Response API endpoint: ${fullUrl}`);
+          customEndpoint = {
+            baseUrl,
+            buildHeaders: (apiKey: string) => ({
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            }),
+            buildPath,
+            format: 'chatgpt',
+          };
+        } else {
+          // Use standard OpenAI-compatible endpoint
+          customEndpoint = buildCustomEndpoint(cp.base_url, cp.path_suffix);
+        }
       }
     } else if (authType === 'subscription' && provider.toLowerCase() === 'minimax' && resourceUrl) {
       const minimaxBaseUrl = normalizeMinimaxSubscriptionBaseUrl(resourceUrl);
