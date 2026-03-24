@@ -192,7 +192,10 @@ const CustomProviderForm: Component<Props> = (props) => {
   };
 
   return (
-    <div class="provider-detail">
+    <div
+      class="provider-detail"
+      style="display: flex; flex-direction: column; height: 100vh; max-height: 100vh; overflow: hidden;"
+    >
       <button class="provider-detail__back" onClick={props.onBack} aria-label="Back to providers">
         <svg
           width="16"
@@ -209,7 +212,10 @@ const CustomProviderForm: Component<Props> = (props) => {
         </svg>
       </button>
 
-      <div class="routing-modal__header" style="border: none; padding: 0; margin-bottom: 20px;">
+      <div
+        class="routing-modal__header"
+        style="border: none; padding: 0; margin-bottom: 20px; flex-shrink: 0;"
+      >
         <div>
           <div class="routing-modal__title">
             {isEdit() ? 'Edit custom provider' : 'Add custom provider'}
@@ -223,287 +229,293 @@ const CustomProviderForm: Component<Props> = (props) => {
           e.preventDefault();
           if (canSubmit()) handleSubmit();
         }}
+        style="display: flex; flex-direction: column; flex: 1; min-height: 0;"
       >
-        <div class="provider-detail__field">
-          <label class="provider-detail__label" for="cp-name">
-            Provider name
-          </label>
-          <input
-            id="cp-name"
-            class="provider-detail__input"
-            type="text"
-            placeholder="e.g. Groq, vLLM, Azure"
-            value={name()}
-            onInput={(e) => {
-              setName(e.currentTarget.value);
-              setError(null);
-            }}
-          />
-        </div>
+        <div style="flex: 1; overflow-y: auto; padding-right: 8px;">
+          <div class="provider-detail__field">
+            <label class="provider-detail__label" for="cp-name">
+              Provider name
+            </label>
+            <input
+              id="cp-name"
+              class="provider-detail__input"
+              type="text"
+              placeholder="e.g. Groq, vLLM, Azure"
+              value={name()}
+              onInput={(e) => {
+                setName(e.currentTarget.value);
+                setError(null);
+              }}
+            />
+          </div>
 
-        <div class="provider-detail__field">
-          <label class="provider-detail__label" for="cp-base-url">
-            Base URL
-          </label>
-          <input
-            id="cp-base-url"
-            class="provider-detail__input"
-            type="url"
-            placeholder="https://api.example.com/v1"
-            value={baseUrl()}
-            onInput={(e) => {
-              setBaseUrl(e.currentTarget.value);
-              setError(null);
-            }}
-          />
-        </div>
+          <div class="provider-detail__field">
+            <label class="provider-detail__label" for="cp-base-url">
+              Base URL
+            </label>
+            <input
+              id="cp-base-url"
+              class="provider-detail__input"
+              type="url"
+              placeholder="https://api.example.com/v1"
+              value={baseUrl()}
+              onInput={(e) => {
+                setBaseUrl(e.currentTarget.value);
+                setError(null);
+              }}
+            />
+          </div>
 
-        <div class="provider-detail__field">
-          <label class="provider-detail__label" for="cp-path-suffix">
-            Path Suffix{' '}
-            <span style="color: hsl(var(--muted-foreground)); font-weight: 400;">
-              (optional, defaults to /v1/chat/completions)
-            </span>
-          </label>
-          <input
-            id="cp-path-suffix"
-            class="provider-detail__input"
-            type="text"
-            placeholder="e.g. /chat/completions"
-            value={pathSuffix()}
-            onInput={(e) => {
-              setPathSuffix(e.currentTarget.value);
-              setError(null);
-            }}
-          />
-        </div>
+          <div class="provider-detail__field">
+            <label class="provider-detail__label" for="cp-path-suffix">
+              Path Suffix{' '}
+              <span style="color: hsl(var(--muted-foreground)); font-weight: 400;">
+                (optional, defaults to /v1/chat/completions)
+              </span>
+            </label>
+            <input
+              id="cp-path-suffix"
+              class="provider-detail__input"
+              type="text"
+              placeholder="e.g. /chat/completions"
+              value={pathSuffix()}
+              onInput={(e) => {
+                setPathSuffix(e.currentTarget.value);
+                setError(null);
+              }}
+            />
+          </div>
 
-        <div class="provider-detail__field">
-          <label class="provider-detail__label" for="cp-api-key">
-            API Key{' '}
-            <span style="color: hsl(var(--muted-foreground)); font-weight: 400;">
-              (optional for local providers)
-            </span>
-          </label>
-          <Show when={isEdit() && !editingKey()}>
-            <div class="provider-detail__key-row">
+          <div class="provider-detail__field">
+            <label class="provider-detail__label" for="cp-api-key">
+              API Key{' '}
+              <span style="color: hsl(var(--muted-foreground)); font-weight: 400;">
+                (optional for local providers)
+              </span>
+            </label>
+            <Show when={isEdit() && !editingKey()}>
+              <div class="provider-detail__key-row">
+                <input
+                  id="cp-api-key"
+                  class="provider-detail__input provider-detail__input--disabled"
+                  type="text"
+                  value={props.initialData?.has_api_key ? '••••••••••••' : 'No key set'}
+                  disabled
+                  aria-label="Current API key (masked)"
+                />
+                <button
+                  type="button"
+                  class="btn btn--outline btn--sm"
+                  onClick={() => {
+                    setEditingKey(true);
+                    setApiKey('');
+                  }}
+                >
+                  Change
+                </button>
+              </div>
+            </Show>
+            <Show when={!isEdit() || editingKey()}>
               <input
                 id="cp-api-key"
-                class="provider-detail__input provider-detail__input--disabled"
+                class="provider-detail__input provider-detail__input--masked"
                 type="text"
-                value={props.initialData?.has_api_key ? '••••••••••••' : 'No key set'}
-                disabled
-                aria-label="Current API key (masked)"
+                autocomplete="off"
+                placeholder="sk-..."
+                value={apiKey()}
+                onInput={(e) => setApiKey(e.currentTarget.value)}
               />
+            </Show>
+          </div>
+
+          <div class="provider-detail__field">
+            <label
+              class="provider-detail__label"
+              style="display: flex; align-items: center; gap: 8px;"
+            >
+              <input
+                type="checkbox"
+                checked={enableResponseAPI()}
+                onInput={(e) => setEnableResponseAPI(e.currentTarget.checked)}
+                style="width: auto;"
+              />
+              Enable OpenAI Response API
+            </label>
+            <div class="routing-modal__subtitle" style="margin-top: 4px;">
+              Enable support for OpenAI's Responses API format (audio, screen capture, etc.)
+            </div>
+          </div>
+
+          <Show when={enableResponseAPI()}>
+            <div
+              class="provider-detail__field"
+              style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px;"
+            >
+              <div class="provider-detail__label" style="margin-bottom: 12px;">
+                Response API Configuration
+              </div>
+
+              <div style="margin-bottom: 12px;">
+                <div class="provider-detail__label" style="font-size: 14px; margin-bottom: 8px;">
+                  Audio
+                </div>
+                <label style="display: block; margin-bottom: 4px;">
+                  <input
+                    type="checkbox"
+                    checked={responseAPIAudioInput()}
+                    onInput={(e) => setResponseAPIAudioInput(e.currentTarget.checked)}
+                    style="width: auto; margin-right: 8px;"
+                  />
+                  Input (audio input from user)
+                </label>
+                <label style="display: block;">
+                  <input
+                    type="checkbox"
+                    checked={responseAPIAudioOutput()}
+                    onInput={(e) => setResponseAPIAudioOutput(e.currentTarget.checked)}
+                    style="width: auto; margin-right: 8px;"
+                  />
+                  Output (audio output to user)
+                </label>
+              </div>
+
+              <div style="margin-bottom: 12px;">
+                <div class="provider-detail__label" style="font-size: 14px; margin-bottom: 8px;">
+                  Screen
+                </div>
+                <label style="display: block; margin-bottom: 4px;">
+                  <input
+                    type="checkbox"
+                    checked={responseAPIScreenCapture()}
+                    onInput={(e) => setResponseAPIScreenCapture(e.currentTarget.checked)}
+                    style="width: auto; margin-right: 8px;"
+                  />
+                  Capture (take screenshots)
+                </label>
+                <label style="display: block;">
+                  <input
+                    type="checkbox"
+                    checked={responseAPIScreenAnalysis()}
+                    onInput={(e) => setResponseAPIScreenAnalysis(e.currentTarget.checked)}
+                    style="width: auto; margin-right: 8px;"
+                  />
+                  Analysis (analyze screen content)
+                </label>
+              </div>
+
+              <div>
+                <label style="display: block;">
+                  <input
+                    type="checkbox"
+                    checked={responseAPIStreaming()}
+                    onInput={(e) => setResponseAPIStreaming(e.currentTarget.checked)}
+                    style="width: auto; margin-right: 8px;"
+                  />
+                  Enable streaming responses
+                </label>
+              </div>
+            </div>
+          </Show>
+
+          <div class="provider-detail__field">
+            <label class="provider-detail__label">Models</label>
+            <div class="custom-provider-models">
+              <Index each={rows()}>
+                {(row, i) => (
+                  <div class="custom-provider-model-row">
+                    <input
+                      class="provider-detail__input custom-provider-model-row__name"
+                      type="text"
+                      placeholder="Model name"
+                      aria-label={`Model ${i + 1} name`}
+                      value={row().model_name}
+                      onInput={(e) => updateRow(i, 'model_name', e.currentTarget.value)}
+                    />
+                    <input
+                      class="provider-detail__input custom-provider-model-row__price"
+                      type="text"
+                      inputmode="decimal"
+                      placeholder="$/M in"
+                      aria-label={`Model ${i + 1} input price per million tokens`}
+                      value={row().input_price}
+                      onInput={(e) => updateRow(i, 'input_price', e.currentTarget.value)}
+                    />
+                    <input
+                      class="provider-detail__input custom-provider-model-row__price"
+                      type="text"
+                      inputmode="decimal"
+                      placeholder="$/M out"
+                      aria-label={`Model ${i + 1} output price per million tokens`}
+                      value={row().output_price}
+                      onInput={(e) => updateRow(i, 'output_price', e.currentTarget.value)}
+                    />
+                    <button
+                      type="button"
+                      class="custom-provider-model-row__remove"
+                      onClick={() => removeRow(i)}
+                      disabled={rows().length <= 1}
+                      aria-label={`Remove model ${i + 1}`}
+                      title="Remove"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </Index>
               <button
                 type="button"
                 class="btn btn--outline btn--sm"
-                onClick={() => {
-                  setEditingKey(true);
-                  setApiKey('');
-                }}
+                onClick={addRow}
+                disabled={!rows().at(-1)?.model_name.trim()}
+                style="margin-top: 4px; align-self: flex-start;"
               >
-                Change
+                + Add model
               </button>
             </div>
-          </Show>
-          <Show when={!isEdit() || editingKey()}>
-            <input
-              id="cp-api-key"
-              class="provider-detail__input provider-detail__input--masked"
-              type="text"
-              autocomplete="off"
-              placeholder="sk-..."
-              value={apiKey()}
-              onInput={(e) => setApiKey(e.currentTarget.value)}
-            />
-          </Show>
+          </div>
+
+          {error() && (
+            <div class="provider-detail__error" role="alert">
+              {error()}
+            </div>
+          )}
         </div>
 
-        <div class="provider-detail__field">
-          <label
-            class="provider-detail__label"
-            style="display: flex; align-items: center; gap: 8px;"
+        {/* Fixed bottom section with save button */}
+        <div style="flex-shrink: 0; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <button
+            type="submit"
+            class="btn btn--primary btn--sm provider-detail__action"
+            disabled={!canSubmit()}
           >
-            <input
-              type="checkbox"
-              checked={enableResponseAPI()}
-              onInput={(e) => setEnableResponseAPI(e.currentTarget.checked)}
-              style="width: auto;"
-            />
-            Enable OpenAI Response API
-          </label>
-          <div class="routing-modal__subtitle" style="margin-top: 4px;">
-            Enable support for OpenAI's Responses API format (audio, screen capture, etc.)
-          </div>
-        </div>
+            {busy() ? <span class="spinner" /> : isEdit() ? 'Save changes' : 'Create'}
+          </button>
 
-        <Show when={enableResponseAPI()}>
-          <div
-            class="provider-detail__field"
-            style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px;"
-          >
-            <div class="provider-detail__label" style="margin-bottom: 12px;">
-              Response API Configuration
-            </div>
-
-            <div style="margin-bottom: 12px;">
-              <div class="provider-detail__label" style="font-size: 14px; margin-bottom: 8px;">
-                Audio
-              </div>
-              <label style="display: block; margin-bottom: 4px;">
-                <input
-                  type="checkbox"
-                  checked={responseAPIAudioInput()}
-                  onInput={(e) => setResponseAPIAudioInput(e.currentTarget.checked)}
-                  style="width: auto; margin-right: 8px;"
-                />
-                Input (audio input from user)
-              </label>
-              <label style="display: block;">
-                <input
-                  type="checkbox"
-                  checked={responseAPIAudioOutput()}
-                  onInput={(e) => setResponseAPIAudioOutput(e.currentTarget.checked)}
-                  style="width: auto; margin-right: 8px;"
-                />
-                Output (audio output to user)
-              </label>
-            </div>
-
-            <div style="margin-bottom: 12px;">
-              <div class="provider-detail__label" style="font-size: 14px; margin-bottom: 8px;">
-                Screen
-              </div>
-              <label style="display: block; margin-bottom: 4px;">
-                <input
-                  type="checkbox"
-                  checked={responseAPIScreenCapture()}
-                  onInput={(e) => setResponseAPIScreenCapture(e.currentTarget.checked)}
-                  style="width: auto; margin-right: 8px;"
-                />
-                Capture (take screenshots)
-              </label>
-              <label style="display: block;">
-                <input
-                  type="checkbox"
-                  checked={responseAPIScreenAnalysis()}
-                  onInput={(e) => setResponseAPIScreenAnalysis(e.currentTarget.checked)}
-                  style="width: auto; margin-right: 8px;"
-                />
-                Analysis (analyze screen content)
-              </label>
-            </div>
-
-            <div>
-              <label style="display: block;">
-                <input
-                  type="checkbox"
-                  checked={responseAPIStreaming()}
-                  onInput={(e) => setResponseAPIStreaming(e.currentTarget.checked)}
-                  style="width: auto; margin-right: 8px;"
-                />
-                Enable streaming responses
-              </label>
-            </div>
-          </div>
-        </Show>
-
-        <div class="provider-detail__field">
-          <label class="provider-detail__label">Models</label>
-          <div class="custom-provider-models">
-            <Index each={rows()}>
-              {(row, i) => (
-                <div class="custom-provider-model-row">
-                  <input
-                    class="provider-detail__input custom-provider-model-row__name"
-                    type="text"
-                    placeholder="Model name"
-                    aria-label={`Model ${i + 1} name`}
-                    value={row().model_name}
-                    onInput={(e) => updateRow(i, 'model_name', e.currentTarget.value)}
-                  />
-                  <input
-                    class="provider-detail__input custom-provider-model-row__price"
-                    type="text"
-                    inputmode="decimal"
-                    placeholder="$/M in"
-                    aria-label={`Model ${i + 1} input price per million tokens`}
-                    value={row().input_price}
-                    onInput={(e) => updateRow(i, 'input_price', e.currentTarget.value)}
-                  />
-                  <input
-                    class="provider-detail__input custom-provider-model-row__price"
-                    type="text"
-                    inputmode="decimal"
-                    placeholder="$/M out"
-                    aria-label={`Model ${i + 1} output price per million tokens`}
-                    value={row().output_price}
-                    onInput={(e) => updateRow(i, 'output_price', e.currentTarget.value)}
-                  />
-                  <button
-                    type="button"
-                    class="custom-provider-model-row__remove"
-                    onClick={() => removeRow(i)}
-                    disabled={rows().length <= 1}
-                    aria-label={`Remove model ${i + 1}`}
-                    title="Remove"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </Index>
+          <Show when={isEdit()}>
             <button
               type="button"
-              class="btn btn--outline btn--sm"
-              onClick={addRow}
-              disabled={!rows().at(-1)?.model_name.trim()}
-              style="margin-top: 4px; align-self: flex-start;"
+              class="btn btn--outline btn--sm provider-detail__disconnect"
+              disabled={busy()}
+              onClick={() => setShowDeleteConfirm(true)}
+              style="margin-top: 16px; align-self: flex-start;"
             >
-              + Add model
+              Delete provider
             </button>
-          </div>
+          </Show>
         </div>
-
-        {error() && (
-          <div class="provider-detail__error" role="alert">
-            {error()}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          class="btn btn--primary btn--sm provider-detail__action"
-          disabled={!canSubmit()}
-        >
-          {busy() ? <span class="spinner" /> : isEdit() ? 'Save changes' : 'Create'}
-        </button>
-
-        <Show when={isEdit()}>
-          <button
-            type="button"
-            class="btn btn--outline btn--sm provider-detail__disconnect"
-            disabled={busy()}
-            onClick={() => setShowDeleteConfirm(true)}
-            style="margin-top: 16px; align-self: flex-start;"
-          >
-            Delete provider
-          </button>
-        </Show>
       </form>
 
       {/* -- Delete Confirmation Modal -- */}
