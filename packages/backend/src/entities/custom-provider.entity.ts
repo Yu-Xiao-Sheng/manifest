@@ -7,6 +7,20 @@ export interface CustomProviderModel {
   input_price_per_million_tokens?: number;
   output_price_per_million_tokens?: number;
   context_window?: number;
+  supports_response_api?: boolean;
+}
+
+export interface ResponseAPIConfig {
+  audio?: {
+    input?: boolean;
+    output?: boolean;
+    format?: 'mp3' | 'wav' | 'pcm16';
+  };
+  screen?: {
+    capture?: boolean;
+    analysis?: boolean;
+  };
+  streaming?: boolean;
 }
 
 @Entity('custom_providers')
@@ -32,6 +46,12 @@ export class CustomProvider {
 
   @Column('simple-json')
   models!: CustomProviderModel[];
+
+  @Column('boolean', { default: false })
+  enable_response_api!: boolean;
+
+  @Column('simple-json', { nullable: true })
+  response_api_config!: ResponseAPIConfig | null;
 
   @ManyToOne(() => Agent, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'agent_id' })

@@ -91,7 +91,10 @@ export class CustomProviderService {
         input_price_per_million_tokens: m.input_price_per_million_tokens,
         output_price_per_million_tokens: m.output_price_per_million_tokens,
         context_window: m.context_window ?? 128000,
+        supports_response_api: m.supports_response_api ?? false,
       })),
+      enable_response_api: dto.enableResponseAPI ?? false,
+      response_api_config: dto.responseAPIConfig ?? null,
       created_at: new Date().toISOString(),
     });
     await this.repo.insert(cp);
@@ -138,7 +141,16 @@ export class CustomProviderService {
         input_price_per_million_tokens: m.input_price_per_million_tokens,
         output_price_per_million_tokens: m.output_price_per_million_tokens,
         context_window: m.context_window ?? 128000,
+        supports_response_api: m.supports_response_api ?? false,
       }));
+    }
+
+    if (dto.enableResponseAPI !== undefined) {
+      cp.enable_response_api = dto.enableResponseAPI;
+    }
+
+    if (dto.responseAPIConfig !== undefined) {
+      cp.response_api_config = dto.responseAPIConfig;
     }
 
     // Update API key if explicitly provided

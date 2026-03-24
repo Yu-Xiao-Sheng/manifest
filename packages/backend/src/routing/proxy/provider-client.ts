@@ -13,6 +13,10 @@ import {
   transformResponsesStreamChunk,
 } from './chatgpt-adapter';
 import { injectOpenRouterCacheControl } from './cache-injection';
+import { CustomProviderService } from '../custom-provider.service';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Agent } from '../../entities/agent.entity';
 
 /**
  * OpenAI-only fields that other providers reject as "extra inputs not permitted".
@@ -120,6 +124,51 @@ export interface ForwardResult {
 const PROVIDER_TIMEOUT_MS = 180_000;
 
 /**
+ * Check if provider is a custom provider that might have Response API enabled
+ */
+function isCustomProvider(provider: string): boolean {
+  return provider.startsWith('custom:');
+}
+
+/**
+ * Build Response API configuration for custom providers
+ */
+function buildResponseAPIConfig(
+  provider: string,
+  body: Record<string, unknown>,
+  agentId?: string,
+  customProviderService?: CustomProviderService,
+): Record<string, unknown> {
+  // Only add Response API config for custom providers
+  if (!isCustomProvider(provider)) {
+    return {};
+  }
+
+  // For now, we'll add Response API fields if they exist in the body
+  // This allows custom providers to use Response API by including these fields
+  const responseAPIConfig: Record<string, unknown> = {};
+
+  // Check if body contains Response API specific fields
+  if (body.response_format) {
+    responseAPIConfig.response_format = body.response_format;
+  }
+
+  if (body.audio) {
+    responseAPIConfig.audio = body.audio;
+  }
+
+  if (body.screen) {
+    responseAPIConfig.screen = body.screen;
+  }
+
+  if (body.modalities) {
+    responseAPIConfig.modalities = body.modalities;
+  }
+
+  return responseAPIConfig;
+}
+
+/**
  * Strip vendor prefix from model name (e.g. "anthropic/claude-sonnet-4" → "claude-sonnet-4").
  * Models synced from OpenRouter use vendor prefixes, but native APIs expect bare names.
  */
@@ -133,6 +182,11 @@ function stripModelPrefix(model: string, endpointKey: string): string {
 @Injectable()
 export class ProviderClient {
   private readonly logger = new Logger(ProviderClient.name);
+
+  constructor(
+    @InjectRepository(Agent)
+    private readonly agentRepo: Repository<Agent>,
+  ) {}
 
   async forward(
     provider: string,
@@ -193,12 +247,35 @@ export class ProviderClient {
     } else {
       url = `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`;
       headers = endpoint.buildHeaders(apiKey, authType);
-      const sanitized = sanitizeOpenAiBody(body, endpointKey, model);
-      requestBody = { ...sanitized, model: bareModel, stream };
 
-      // Inject cache_control for OpenRouter requests targeting Anthropic models
-      if (endpointKey === 'openrouter' && model.startsWith('anthropic/')) {
-        injectOpenRouterCacheControl(requestBody);
+      // For custom providers, preserve Response API fields if present
+      if (endpointKey === 'custom' && customEndpoint) {
+        // Check if this is a custom provider with Response API enabled
+        const responseAPIConfig = buildResponseAPIConfig(provider, body);
+
+        if (Object.keys(responseAPIConfig).length > 0) {
+          // Preserve Response API fields
+          const sanitized = sanitizeOpenAiBody(body, endpointKey, model);
+          requestBody = {
+            ...sanitized,
+            model: bareModel,
+            stream,
+            ...responseAPIConfig  // Add Response API specific fields
+          };
+        } else {
+          // Standard sanitization
+          const sanitized = sanitizeOpenAiBody(body, endpointKey, model);
+          requestBody = { ...sanitized, model: bareModel, stream };
+        }
+      } else {
+        // Standard sanitization for non-custom providers
+        const sanitized = sanitizeOpenAiBody(body, endpointKey, model);
+        requestBody = { ...sanitized, model: bareModel, stream };
+
+        // Inject cache_control for OpenRouter requests targeting Anthropic models
+        if (endpointKey === 'openrouter' && model.startsWith('anthropic/')) {
+          injectOpenRouterCacheControl(requestBody);
+        }
       }
     }
 

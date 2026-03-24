@@ -12,8 +12,32 @@ import {
   ArrayMaxSize,
   IsUrl,
   Min,
+  IsBoolean,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class ResponseAPIConfigDto {
+  @IsOptional()
+  @IsObject()
+  audio?: {
+    input?: boolean;
+    output?: boolean;
+    format?: 'mp3' | 'wav' | 'pcm16';
+  };
+
+  @IsOptional()
+  @IsObject()
+  screen?: {
+    capture?: boolean;
+    analysis?: boolean;
+  };
+
+  @IsOptional()
+  @IsBoolean()
+  streaming?: boolean;
+}
+
 export class CustomProviderModelDto {
   @IsString()
   @IsNotEmpty()
@@ -37,6 +61,10 @@ export class CustomProviderModelDto {
   @Min(1)
   @Type(() => Number)
   context_window?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  supports_response_api?: boolean;
 }
 
 export class CreateCustomProviderDto {
@@ -72,6 +100,15 @@ export class CreateCustomProviderDto {
   @ValidateNested({ each: true })
   @Type(() => CustomProviderModelDto)
   models!: CustomProviderModelDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  enableResponseAPI?: boolean;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ResponseAPIConfigDto)
+  responseAPIConfig?: ResponseAPIConfigDto;
 }
 
 export class UpdateCustomProviderDto {
@@ -110,4 +147,13 @@ export class UpdateCustomProviderDto {
   @ValidateNested({ each: true })
   @Type(() => CustomProviderModelDto)
   models?: CustomProviderModelDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  enableResponseAPI?: boolean;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ResponseAPIConfigDto)
+  responseAPIConfig?: ResponseAPIConfigDto;
 }
