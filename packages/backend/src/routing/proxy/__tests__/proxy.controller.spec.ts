@@ -75,6 +75,10 @@ describe('ProxyController', () => {
     convertGoogleStreamChunk: jest.Mock;
     convertAnthropicResponse: jest.Mock;
     convertAnthropicStreamChunk: jest.Mock;
+    createAnthropicStreamTransformer: jest.Mock;
+    convertChatGptResponse: jest.Mock;
+    convertChatGptStreamChunk: jest.Mock;
+    createChatGptStreamTransformer: jest.Mock;
   };
   let mockMessageManager: {
     transaction: jest.Mock;
@@ -106,6 +110,10 @@ describe('ProxyController', () => {
       convertGoogleStreamChunk: jest.fn(),
       convertAnthropicResponse: jest.fn(),
       convertAnthropicStreamChunk: jest.fn(),
+      createAnthropicStreamTransformer: jest.fn(() => jest.fn()),
+      convertChatGptResponse: jest.fn(),
+      convertChatGptStreamChunk: jest.fn(),
+      createChatGptStreamTransformer: jest.fn(() => jest.fn()),
     };
     mockMessageManager = {
       transaction: jest.fn(async (cb: (manager: unknown) => Promise<unknown>) =>
@@ -244,20 +252,22 @@ describe('ProxyController', () => {
     expect(res.json).toHaveBeenCalledWith(convertedBody);
   });
 
-  it('should convert ChatGPT response for non-streaming', async () => {
-    const chatgptBody = {
-      output: [{ type: 'message', content: [{ type: 'output_text', text: 'hi' }] }],
-      usage: { input_tokens: 5, output_tokens: 3, total_tokens: 8 },
-    };
-    const convertedBody = {
-      choices: [{ message: { content: 'hi' } }],
-      usage: { prompt_tokens: 5, completion_tokens: 3 },
-    };
-
-    const mockProviderResp = new Response(JSON.stringify(chatgptBody), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  it('should force ChatGPT responses through the streaming transformer', async () => {
+    const encoder = new TextEncoder();
+    const mockProviderResp = new Response(
+      new ReadableStream({
+        start(ctrl) {
+          ctrl.enqueue(
+            encoder.encode('event: response.output_text.delta\ndata: {"delta":"hi"}\n\n'),
+          );
+          ctrl.close();
+        },
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      },
+    );
 
     proxyService.proxyRequest.mockResolvedValue({
       forward: { response: mockProviderResp, isGoogle: false, isAnthropic: false, isChatGpt: true },
@@ -269,19 +279,24 @@ describe('ProxyController', () => {
         reason: 'scored',
       },
     });
-    (providerClient as Record<string, jest.Mock>).convertChatGptResponse = jest
+    const transform = jest
       .fn()
-      .mockReturnValue(convertedBody);
+      .mockReturnValue('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n');
+    (providerClient as Record<string, jest.Mock>).createChatGptStreamTransformer = jest
+      .fn()
+      .mockReturnValue(transform);
 
     const req = mockRequest({ messages: [{ role: 'user', content: 'test' }] });
-    const { res } = mockResponse();
+    const { res, written } = mockResponse();
 
     await controller.chatCompletions(req as never, res as never);
 
     expect(
-      (providerClient as Record<string, jest.Mock>).convertChatGptResponse,
-    ).toHaveBeenCalledWith(chatgptBody, 'gpt-5.3-codex');
-    expect(res.json).toHaveBeenCalledWith(convertedBody);
+      (providerClient as Record<string, jest.Mock>).createChatGptStreamTransformer,
+    ).toHaveBeenCalledWith('gpt-5.3-codex');
+    expect(transform).toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+    expect(written.some((w) => w.includes('delta'))).toBe(true);
   });
 
   it('should record success message with usage from non-streaming response', async () => {
@@ -2471,7 +2486,7 @@ describe('ProxyController', () => {
       expect(written.some((w) => w.includes('delta'))).toBe(true);
     });
 
-    it('should transform ChatGPT streaming through convertChatGptStreamChunk', async () => {
+    it('should transform ChatGPT streaming through createChatGptStreamTransformer', async () => {
       const mockProviderResp = createMockStreamResponse([
         'event: response.output_text.delta\ndata: {"delta":"hi"}\n\n',
       ]);
@@ -2492,9 +2507,12 @@ describe('ProxyController', () => {
         },
       });
 
-      (providerClient as Record<string, jest.Mock>).convertChatGptStreamChunk = jest
+      const transform = jest
         .fn()
         .mockReturnValue('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n');
+      (providerClient as Record<string, jest.Mock>).createChatGptStreamTransformer = jest
+        .fn()
+        .mockReturnValue(transform);
 
       const req = mockRequest({
         messages: [{ role: 'user', content: 'test' }],
@@ -2505,8 +2523,9 @@ describe('ProxyController', () => {
       await controller.chatCompletions(req as never, res as never);
 
       expect(
-        (providerClient as Record<string, jest.Mock>).convertChatGptStreamChunk,
+        (providerClient as Record<string, jest.Mock>).createChatGptStreamTransformer,
       ).toHaveBeenCalled();
+      expect(transform).toHaveBeenCalled();
       expect(written.some((w) => w.includes('delta'))).toBe(true);
     });
 

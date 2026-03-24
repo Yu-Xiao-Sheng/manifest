@@ -2,6 +2,7 @@ import {
   toResponsesRequest,
   fromResponsesResponse,
   transformResponsesStreamChunk,
+  createResponsesStreamTransformer,
 } from '../chatgpt-adapter';
 
 describe('ChatGPT Adapter', () => {
@@ -175,6 +176,89 @@ describe('ChatGPT Adapter', () => {
 
       expect(result.instructions).toBe('You are a helpful assistant.');
     });
+
+    it('converts Chat Completions tools to Responses tools and tool_choice', () => {
+      const body = {
+        messages: [{ role: 'user', content: 'Find weather' }],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'get_weather',
+              description: 'Look up weather',
+              parameters: {
+                type: 'object',
+                properties: { city: { type: 'string' } },
+                required: ['city'],
+              },
+              strict: true,
+            },
+          },
+        ],
+        tool_choice: { type: 'function', function: { name: 'get_weather' } },
+        parallel_tool_calls: false,
+      };
+
+      const result = toResponsesRequest(body, 'gpt-5');
+
+      expect(result.tools).toEqual([
+        {
+          type: 'function',
+          name: 'get_weather',
+          description: 'Look up weather',
+          parameters: {
+            type: 'object',
+            properties: { city: { type: 'string' } },
+            required: ['city'],
+          },
+          strict: true,
+        },
+      ]);
+      expect(result.tool_choice).toEqual({ type: 'function', name: 'get_weather' });
+      expect(result.parallel_tool_calls).toBe(false);
+    });
+
+    it('converts assistant tool_calls and tool results into Responses input items', () => {
+      const body = {
+        messages: [
+          { role: 'user', content: 'Search cats' },
+          {
+            role: 'assistant',
+            content: 'Searching now.',
+            tool_calls: [
+              {
+                id: 'call_1',
+                type: 'function',
+                function: { name: 'search_web', arguments: '{"q":"cats"}' },
+              },
+            ],
+          },
+          {
+            role: 'tool',
+            tool_call_id: 'call_1',
+            content: '{"results":["cat"]}',
+          },
+        ],
+      };
+
+      const result = toResponsesRequest(body, 'gpt-5');
+
+      expect(result.input).toEqual([
+        { role: 'user', content: [{ type: 'input_text', text: 'Search cats' }] },
+        { role: 'assistant', content: [{ type: 'output_text', text: 'Searching now.' }] },
+        {
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'search_web',
+          arguments: '{"q":"cats"}',
+        },
+        {
+          type: 'function_call_output',
+          call_id: 'call_1',
+          output: '{"results":["cat"]}',
+        },
+      ]);
+    });
   });
 
   describe('fromResponsesResponse', () => {
@@ -227,10 +311,10 @@ describe('ChatGPT Adapter', () => {
       expect(choices[0].message.content).toBe('Part 1. Part 2.');
     });
 
-    it('skips non-message output items', () => {
+    it('maps function_call output items to OpenAI tool_calls', () => {
       const data = {
         output: [
-          { type: 'function_call', name: 'search', arguments: '{}' },
+          { type: 'function_call', call_id: 'call_123', name: 'search', arguments: '{}' },
           {
             type: 'message',
             content: [{ type: 'output_text', text: 'Result' }],
@@ -238,8 +322,20 @@ describe('ChatGPT Adapter', () => {
         ],
       };
       const result = fromResponsesResponse(data, 'gpt-5');
-      const choices = result.choices as { message: { content: string } }[];
+      const choices = result.choices as Array<{
+        message: { content: string; tool_calls?: Array<Record<string, unknown>> };
+        finish_reason: string;
+      }>;
+
       expect(choices[0].message.content).toBe('Result');
+      expect(choices[0].message.tool_calls).toEqual([
+        {
+          id: 'call_123',
+          type: 'function',
+          function: { name: 'search', arguments: '{}' },
+        },
+      ]);
+      expect(choices[0].finish_reason).toBe('tool_calls');
     });
 
     it('handles empty output', () => {
@@ -351,6 +447,77 @@ describe('ChatGPT Adapter', () => {
     it('returns null for empty lines only', () => {
       const result = transformResponsesStreamChunk('   ', 'gpt-5');
       expect(result).toBeNull();
+    });
+
+    it('converts function_call output_item.added to tool_calls delta', () => {
+      const chunk =
+        'event: response.output_item.added\ndata: {"output_index":2,"item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"search_web","arguments":""}}';
+      const result = transformResponsesStreamChunk(chunk, 'gpt-5');
+
+      expect(result).not.toBeNull();
+      const json = JSON.parse(result!.replace('data: ', '').trim());
+      expect(json.choices[0].delta.tool_calls).toEqual([
+        {
+          index: 0,
+          id: 'call_1',
+          type: 'function',
+          function: { name: 'search_web', arguments: '' },
+        },
+      ]);
+    });
+
+    it('marks response.completed as tool_calls when completed response has function calls', () => {
+      const chunk = `event: response.completed\ndata: ${JSON.stringify({
+        response: {
+          output: [
+            { type: 'function_call', call_id: 'call_1', name: 'search_web', arguments: '{}' },
+          ],
+          usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
+        },
+      })}`;
+      const result = transformResponsesStreamChunk(chunk, 'gpt-5');
+
+      expect(result).not.toBeNull();
+      expect(result).toContain('"finish_reason":"tool_calls"');
+      expect(result).toContain('data: [DONE]');
+    });
+  });
+
+  describe('createResponsesStreamTransformer', () => {
+    it('tracks function call indexes separately from output indexes', () => {
+      const transform = createResponsesStreamTransformer('gpt-5');
+
+      const added = transform(
+        'event: response.output_item.added\ndata: {"output_index":3,"item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"search_web","arguments":""}}',
+      );
+      const delta = transform(
+        'event: response.function_call_arguments.delta\ndata: {"item_id":"fc_1","delta":"{\\"q\\":\\"cat"}',
+      );
+
+      const addedJson = JSON.parse(added!.replace('data: ', '').trim());
+      const deltaJson = JSON.parse(delta!.replace('data: ', '').trim());
+
+      expect(addedJson.choices[0].delta.tool_calls[0].index).toBe(0);
+      expect(deltaJson.choices[0].delta.tool_calls[0].index).toBe(0);
+      expect(deltaJson.choices[0].delta.tool_calls[0].function.arguments).toBe('{"q":"cat');
+    });
+
+    it('emits only the remaining arguments on function_call_arguments.done', () => {
+      const transform = createResponsesStreamTransformer('gpt-5');
+
+      transform(
+        'event: response.output_item.added\ndata: {"item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"search_web","arguments":""}}',
+      );
+      transform(
+        'event: response.function_call_arguments.delta\ndata: {"item_id":"fc_1","delta":"{\\"q\\":\\"cat"}',
+      );
+      const done = transform(
+        'event: response.function_call_arguments.done\ndata: {"item_id":"fc_1","arguments":"{\\"q\\":\\"cats\\"}"}',
+      );
+
+      expect(done).not.toBeNull();
+      const json = JSON.parse(done!.replace('data: ', '').trim());
+      expect(json.choices[0].delta.tool_calls[0].function.arguments).toBe('s"}');
     });
   });
 });

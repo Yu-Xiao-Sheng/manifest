@@ -214,8 +214,10 @@ export class ProxyController {
             this.providerClient.createAnthropicStreamTransformer(meta.model),
           );
         } else if (forward.isChatGpt) {
-          streamUsage = await pipeStream(providerResponse.body, res, (chunk) =>
-            this.providerClient.convertChatGptStreamChunk(chunk, meta.model),
+          streamUsage = await pipeStream(
+            providerResponse.body,
+            res,
+            this.providerClient.createChatGptStreamTransformer(meta.model),
           );
         } else {
           streamUsage = await pipeStream(providerResponse.body, res);

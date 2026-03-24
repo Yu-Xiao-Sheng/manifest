@@ -11,6 +11,7 @@ import {
   toResponsesRequest,
   fromResponsesResponse,
   transformResponsesStreamChunk,
+  createResponsesStreamTransformer,
 } from './chatgpt-adapter';
 import { injectOpenRouterCacheControl } from './cache-injection';
 import { CustomProviderService } from '../custom-provider.service';
@@ -260,7 +261,7 @@ export class ProviderClient {
             ...sanitized,
             model: bareModel,
             stream,
-            ...responseAPIConfig  // Add Response API specific fields
+            ...responseAPIConfig, // Add Response API specific fields
           };
         } else {
           // Standard sanitization
@@ -308,6 +309,11 @@ export class ProviderClient {
   /** Convert a ChatGPT Responses API SSE chunk to OpenAI format. */
   convertChatGptStreamChunk(chunk: string, model: string): string | null {
     return transformResponsesStreamChunk(chunk, model);
+  }
+
+  /** Create a stateful ChatGPT Responses API SSE transformer. */
+  createChatGptStreamTransformer(model: string): (chunk: string) => string | null {
+    return createResponsesStreamTransformer(model);
   }
 
   /** Convert a Google non-streaming response to OpenAI format. */

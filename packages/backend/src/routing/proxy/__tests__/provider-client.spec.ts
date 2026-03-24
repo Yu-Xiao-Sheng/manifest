@@ -7,7 +7,7 @@ describe('ProviderClient', () => {
   let client: ProviderClient;
 
   beforeEach(() => {
-    client = new ProviderClient();
+    client = new ProviderClient(undefined as never);
     mockFetch.mockReset();
   });
 
