@@ -169,7 +169,7 @@ const Routing: Component = () => {
 
   const handleProviderUpdate = async () => {
     const wasEnabled = isEnabled();
-    await Promise.all([
+    await Promise.allSettled([
       refetchProviders(),
       refetchCustomProviders(),
       refetchTiers(),

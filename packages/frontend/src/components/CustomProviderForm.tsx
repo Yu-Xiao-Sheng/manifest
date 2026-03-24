@@ -1,4 +1,4 @@
-import { createSignal, Index, For, Show, type Component } from 'solid-js';
+import { createSignal, Index, Show, on, createEffect, type Component } from 'solid-js';
 import {
   createCustomProvider,
   updateCustomProvider,
@@ -10,10 +10,10 @@ import { toast } from '../services/toast-store.js';
 
 interface Props {
   agentName: string;
-  onCreated: () => void;
+  onCreated: () => Promise<void> | void;
   onBack: () => void;
   initialData?: CustomProviderData;
-  onDeleted?: () => void;
+  onDeleted?: () => Promise<void> | void;
 }
 
 interface ModelRow {
@@ -35,6 +35,23 @@ const toModelRows = (models: CustomProviderModel[]): ModelRow[] =>
 
 const CustomProviderForm: Component<Props> = (props) => {
   const isEdit = () => !!props.initialData;
+
+  const resetForm = (initialData?: CustomProviderData) => {
+    setName(initialData?.name ?? '');
+    setBaseUrl(initialData?.base_url ?? '');
+    setPathSuffix(initialData?.path_suffix ?? '');
+    setApiKey('');
+    setEditingKey(false);
+    setRows(initialData ? toModelRows(initialData.models) : [emptyRow()]);
+    setError(null);
+    setShowDeleteConfirm(false);
+    setEnableResponseAPI(initialData?.enable_response_api ?? false);
+    setResponseAPIAudioInput(initialData?.response_api_config?.audio?.input ?? false);
+    setResponseAPIAudioOutput(initialData?.response_api_config?.audio?.output ?? false);
+    setResponseAPIScreenCapture(initialData?.response_api_config?.screen?.capture ?? false);
+    setResponseAPIScreenAnalysis(initialData?.response_api_config?.screen?.analysis ?? false);
+    setResponseAPIStreaming(initialData?.response_api_config?.streaming ?? false);
+  };
 
   const [name, setName] = createSignal(props.initialData?.name ?? '');
   const [baseUrl, setBaseUrl] = createSignal(props.initialData?.base_url ?? '');
@@ -66,6 +83,13 @@ const CustomProviderForm: Component<Props> = (props) => {
   );
   const [responseAPIStreaming, setResponseAPIStreaming] = createSignal(
     props.initialData?.response_api_config?.streaming ?? false,
+  );
+
+  createEffect(
+    on(
+      () => props.initialData?.id ?? null,
+      () => resetForm(props.initialData),
+    ),
   );
 
   const updateRow = (index: number, field: keyof ModelRow, value: string) => {
@@ -124,7 +148,7 @@ const CustomProviderForm: Component<Props> = (props) => {
         models: buildModels(),
       });
       toast.success(`${name().trim()} connected`);
-      props.onCreated();
+      await props.onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create provider');
     } finally {
@@ -164,7 +188,7 @@ const CustomProviderForm: Component<Props> = (props) => {
     try {
       await updateCustomProvider(props.agentName, props.initialData!.id, data as never);
       toast.success(`${name().trim()} updated`);
-      props.onCreated();
+      await props.onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update provider');
     } finally {
@@ -177,7 +201,7 @@ const CustomProviderForm: Component<Props> = (props) => {
     try {
       await deleteCustomProvider(props.agentName, props.initialData!.id);
       toast.success(`${props.initialData!.name} removed`);
-      props.onDeleted?.();
+      await props.onDeleted?.();
     } catch {
       // error toast from fetchMutate
     } finally {
@@ -186,9 +210,9 @@ const CustomProviderForm: Component<Props> = (props) => {
     }
   };
 
-  const handleSubmit = () => {
-    if (isEdit()) handleUpdate();
-    else handleCreate();
+  const handleSubmit = async () => {
+    if (isEdit()) await handleUpdate();
+    else await handleCreate();
   };
 
   return (
@@ -227,7 +251,7 @@ const CustomProviderForm: Component<Props> = (props) => {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (canSubmit()) handleSubmit();
+          if (canSubmit()) void handleSubmit();
         }}
         style="display: flex; flex-direction: column; flex: 1; min-height: 0;"
       >

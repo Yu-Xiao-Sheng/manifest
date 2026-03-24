@@ -21,7 +21,7 @@ interface Props {
   providers: RoutingProvider[];
   customProviders?: CustomProviderData[];
   onClose: () => void;
-  onUpdate: () => void;
+  onUpdate: () => Promise<void> | void;
 }
 
 const ProviderSelectModal: Component<Props> = (props) => {
@@ -29,9 +29,7 @@ const ProviderSelectModal: Component<Props> = (props) => {
   const [selectedProvider, setSelectedProvider] = createSignal<string | null>(null);
   const [selectedAuthType, setSelectedAuthType] = createSignal<AuthType>('api_key');
   const [showCustomForm, setShowCustomForm] = createSignal(false);
-  const [editingCustomProvider, setEditingCustomProvider] = createSignal<CustomProviderData | null>(
-    null,
-  );
+  const [editingCustomProviderId, setEditingCustomProviderId] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [keyInput, setKeyInput] = createSignal('');
   const [editing, setEditing] = createSignal(false);
@@ -45,6 +43,8 @@ const ProviderSelectModal: Component<Props> = (props) => {
 
   const getProviderByAuth = (provId: string, authType: AuthType) =>
     props.providers.find((p) => p.provider === provId && p.auth_type === authType);
+  const editingCustomProvider = () =>
+    props.customProviders?.find((cp) => cp.id === editingCustomProviderId()) ?? null;
 
   const isConnected = (provId: string): boolean => {
     const p = getProviderByAuth(provId, 'api_key');
@@ -80,7 +80,7 @@ const ProviderSelectModal: Component<Props> = (props) => {
     setDirection('back');
     setSelectedProvider(null);
     setShowCustomForm(false);
-    setEditingCustomProvider(null);
+    setEditingCustomProviderId(null);
     setKeyInput('');
     setEditing(false);
     setValidationError(null);
@@ -88,12 +88,14 @@ const ProviderSelectModal: Component<Props> = (props) => {
 
   const openCustomForm = () => {
     setDirection('forward');
+    setEditingCustomProviderId(null);
     setShowCustomForm(true);
   };
 
   const openEditCustom = (cp: CustomProviderData) => {
     setDirection('forward');
-    setEditingCustomProvider(cp);
+    setShowCustomForm(false);
+    setEditingCustomProviderId(cp.id);
   };
 
   const handleSubscriptionToggle = async (provId: string) => {
@@ -147,14 +149,14 @@ const ProviderSelectModal: Component<Props> = (props) => {
             <CustomProviderForm
               agentName={props.agentName}
               initialData={editingCustomProvider() ?? undefined}
-              onCreated={() => {
+              onCreated={async () => {
+                await props.onUpdate();
                 goBack();
-                props.onUpdate();
               }}
               onBack={goBack}
-              onDeleted={() => {
+              onDeleted={async () => {
+                await props.onUpdate();
                 goBack();
-                props.onUpdate();
               }}
             />
           </div>
