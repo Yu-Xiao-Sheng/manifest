@@ -576,6 +576,20 @@ export interface CustomProviderModel {
   input_price_per_million_tokens?: number;
   output_price_per_million_tokens?: number;
   context_window?: number;
+  supports_response_api?: boolean;
+}
+
+export interface ResponseAPIConfig {
+  audio?: {
+    input?: boolean;
+    output?: boolean;
+    format?: 'mp3' | 'wav' | 'pcm16';
+  };
+  screen?: {
+    capture?: boolean;
+    analysis?: boolean;
+  };
+  streaming?: boolean;
 }
 
 export interface CustomProviderData {
@@ -585,6 +599,8 @@ export interface CustomProviderData {
   path_suffix?: string | null;
   has_api_key: boolean;
   models: CustomProviderModel[];
+  enable_response_api?: boolean;
+  response_api_config?: ResponseAPIConfig;
   created_at: string;
 }
 
@@ -601,6 +617,8 @@ export function createCustomProvider(
     base_url: string;
     path_suffix?: string | null;
     apiKey?: string;
+    enableResponseAPI?: boolean;
+    responseAPIConfig?: ResponseAPIConfig;
     models: CustomProviderModel[];
   },
 ) {
@@ -622,6 +640,8 @@ export function updateCustomProvider(
     base_url?: string;
     path_suffix?: string | null;
     apiKey?: string;
+    enableResponseAPI?: boolean;
+    responseAPIConfig?: ResponseAPIConfig | null;
     models?: CustomProviderModel[];
   },
 ) {

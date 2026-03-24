@@ -48,6 +48,26 @@ const CustomProviderForm: Component<Props> = (props) => {
   const [error, setError] = createSignal<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
 
+  // Response API configuration
+  const [enableResponseAPI, setEnableResponseAPI] = createSignal(
+    props.initialData?.enable_response_api ?? false,
+  );
+  const [responseAPIAudioInput, setResponseAPIAudioInput] = createSignal(
+    props.initialData?.response_api_config?.audio?.input ?? false,
+  );
+  const [responseAPIAudioOutput, setResponseAPIAudioOutput] = createSignal(
+    props.initialData?.response_api_config?.audio?.output ?? false,
+  );
+  const [responseAPIScreenCapture, setResponseAPIScreenCapture] = createSignal(
+    props.initialData?.response_api_config?.screen?.capture ?? false,
+  );
+  const [responseAPIScreenAnalysis, setResponseAPIScreenAnalysis] = createSignal(
+    props.initialData?.response_api_config?.screen?.analysis ?? false,
+  );
+  const [responseAPIStreaming, setResponseAPIStreaming] = createSignal(
+    props.initialData?.response_api_config?.streaming ?? false,
+  );
+
   const updateRow = (index: number, field: keyof ModelRow, value: string) => {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
   };
@@ -73,17 +93,34 @@ const CustomProviderForm: Component<Props> = (props) => {
       ...(r.output_price !== ''
         ? { output_price_per_million_tokens: parsePrice(r.output_price) }
         : {}),
+      supports_response_api: enableResponseAPI(),
     }));
 
   const handleCreate = async () => {
     setError(null);
     setBusy(true);
     try {
+      const responseAPIConfig = enableResponseAPI()
+        ? {
+            audio: {
+              input: responseAPIAudioInput(),
+              output: responseAPIAudioOutput(),
+            },
+            screen: {
+              capture: responseAPIScreenCapture(),
+              analysis: responseAPIScreenAnalysis(),
+            },
+            streaming: responseAPIStreaming(),
+          }
+        : undefined;
+
       await createCustomProvider(props.agentName, {
         name: name().trim(),
         base_url: baseUrl().trim(),
         path_suffix: pathSuffix().trim() || null,
         apiKey: apiKey().trim() || undefined,
+        enableResponseAPI: enableResponseAPI(),
+        responseAPIConfig,
         models: buildModels(),
       });
       toast.success(`${name().trim()} connected`);
@@ -97,10 +134,26 @@ const CustomProviderForm: Component<Props> = (props) => {
 
   const handleUpdate = async () => {
     setError(null);
+    const responseAPIConfig = enableResponseAPI()
+      ? {
+          audio: {
+            input: responseAPIAudioInput(),
+            output: responseAPIAudioOutput(),
+          },
+          screen: {
+            capture: responseAPIScreenCapture(),
+            analysis: responseAPIScreenAnalysis(),
+          },
+          streaming: responseAPIStreaming(),
+        }
+      : null;
+
     const data: Record<string, unknown> = {
       name: name().trim(),
       base_url: baseUrl().trim(),
       path_suffix: pathSuffix().trim() || null,
+      enableResponseAPI: enableResponseAPI(),
+      responseAPIConfig,
       models: buildModels(),
     };
     if (editingKey()) {
@@ -266,6 +319,95 @@ const CustomProviderForm: Component<Props> = (props) => {
             />
           </Show>
         </div>
+
+        <div class="provider-detail__field">
+          <label
+            class="provider-detail__label"
+            style="display: flex; align-items: center; gap: 8px;"
+          >
+            <input
+              type="checkbox"
+              checked={enableResponseAPI()}
+              onInput={(e) => setEnableResponseAPI(e.currentTarget.checked)}
+              style="width: auto;"
+            />
+            Enable OpenAI Response API
+          </label>
+          <div class="routing-modal__subtitle" style="margin-top: 4px;">
+            Enable support for OpenAI's Responses API format (audio, screen capture, etc.)
+          </div>
+        </div>
+
+        <Show when={enableResponseAPI()}>
+          <div
+            class="provider-detail__field"
+            style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px;"
+          >
+            <div class="provider-detail__label" style="margin-bottom: 12px;">
+              Response API Configuration
+            </div>
+
+            <div style="margin-bottom: 12px;">
+              <div class="provider-detail__label" style="font-size: 14px; margin-bottom: 8px;">
+                Audio
+              </div>
+              <label style="display: block; margin-bottom: 4px;">
+                <input
+                  type="checkbox"
+                  checked={responseAPIAudioInput()}
+                  onInput={(e) => setResponseAPIAudioInput(e.currentTarget.checked)}
+                  style="width: auto; margin-right: 8px;"
+                />
+                Input (audio input from user)
+              </label>
+              <label style="display: block;">
+                <input
+                  type="checkbox"
+                  checked={responseAPIAudioOutput()}
+                  onInput={(e) => setResponseAPIAudioOutput(e.currentTarget.checked)}
+                  style="width: auto; margin-right: 8px;"
+                />
+                Output (audio output to user)
+              </label>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+              <div class="provider-detail__label" style="font-size: 14px; margin-bottom: 8px;">
+                Screen
+              </div>
+              <label style="display: block; margin-bottom: 4px;">
+                <input
+                  type="checkbox"
+                  checked={responseAPIScreenCapture()}
+                  onInput={(e) => setResponseAPIScreenCapture(e.currentTarget.checked)}
+                  style="width: auto; margin-right: 8px;"
+                />
+                Capture (take screenshots)
+              </label>
+              <label style="display: block;">
+                <input
+                  type="checkbox"
+                  checked={responseAPIScreenAnalysis()}
+                  onInput={(e) => setResponseAPIScreenAnalysis(e.currentTarget.checked)}
+                  style="width: auto; margin-right: 8px;"
+                />
+                Analysis (analyze screen content)
+              </label>
+            </div>
+
+            <div>
+              <label style="display: block;">
+                <input
+                  type="checkbox"
+                  checked={responseAPIStreaming()}
+                  onInput={(e) => setResponseAPIStreaming(e.currentTarget.checked)}
+                  style="width: auto; margin-right: 8px;"
+                />
+                Enable streaming responses
+              </label>
+            </div>
+          </div>
+        </Show>
 
         <div class="provider-detail__field">
           <label class="provider-detail__label">Models</label>
